@@ -8,21 +8,28 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color // ⬅️ Tambah ini
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.myquran.data.Ayat
 import com.example.myquran.viewmodel.DetailViewModel
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailSurahScreen(surahId: Int, viewModel: DetailViewModel) {
+fun DetailSurahScreen(
+    surahId: Int,
+    viewModel: DetailViewModel,
+    account: GoogleSignInAccount?
+) {
     val ayatList = viewModel.ayahList.collectAsState().value
     val isLoading = viewModel.isLoading.collectAsState().value
     val context = LocalContext.current
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-
     var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
 
     LaunchedEffect(surahId) {
@@ -38,16 +45,43 @@ fun DetailSurahScreen(surahId: Int, viewModel: DetailViewModel) {
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Detail Surah") })
+            TopAppBar(
+                title = { Text("\uD83D\uDD4BDetail Surah\uD83D\uDD4B", color = Color.Black) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFFFE4EC), // 🟣 soft pink (seperti HomeScreen)
+                    titleContentColor = Color.Black
+                )
+            )
         },
-        containerColor = Color(0xFFD6F0FF) // 🎨 Soft biru di background utama
+        containerColor = Color(0xFFD6F0FF) // 🔵 tetap biru muda untuk latar halaman
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 🔍 Search field
+            // ✅ Info akun
+            if (account != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    AsyncImage(
+                        model = account.photoUrl,
+                        contentDescription = "Foto Profil",
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(text = account.displayName ?: "", fontWeight = FontWeight.Bold)
+                        Text(text = account.email ?: "", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            // 🔍 Search
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -63,8 +97,7 @@ fun DetailSurahScreen(surahId: Int, viewModel: DetailViewModel) {
                 }
             } else {
                 val filteredList = ayatList.filter {
-                    it.arabicText.contains(searchQuery.text, ignoreCase = true) ||
-                            it.translationText.contains(searchQuery.text, ignoreCase = true)
+                    it.translationText.contains(searchQuery.text, ignoreCase = true)
                 }
 
                 LazyColumn(
@@ -99,7 +132,7 @@ fun AyatCard(ayat: Ayat, onPlayAudio: (String) -> Unit) {
             .fillMaxWidth()
             .padding(vertical = 6.dp, horizontal = 8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFFFE4EC) // 🎨 Soft pink untuk card ayat
+            containerColor = Color(0xFFFFE4EC) // Pink lembut untuk kartu ayat
         ),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {

@@ -1,45 +1,94 @@
 package com.example.myquran.HomeScreen
 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
-import com.example.myquran.R
-import com.example.myquran.ui.theme.MyQuranTheme
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import com.example.myquran.R
+import com.example.myquran.googleclient.GoogleClient
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(
+    navController: NavController,
+    googleClient: GoogleClient,
+    account: GoogleSignInAccount?,
+    onAccountChanged: (GoogleSignInAccount?) -> Unit
+) {
+    val context = LocalContext.current
+    var showProfileDialog by remember { mutableStateOf(false) }
+    var showLoginPrompt by remember { mutableStateOf(account == null) }
+
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val resultData = result.data
+        if (result.resultCode == Activity.RESULT_OK && resultData != null) {
+            googleClient.handleSignInResult(
+                data = resultData,
+                onSuccess = { acc ->
+                    onAccountChanged(acc) // ✅ Update global account
+                    showLoginPrompt = false
+                    Toast.makeText(context, "Login berhasil: ${acc.displayName}", Toast.LENGTH_SHORT).show()
+                },
+                onError = { e ->
+                    Toast.makeText(context, "Login gagal: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("📖 Al-Qur'an Digital") },
+                title = { Text("📖 Al-Qur'an Digital", color = Color.Black) },
+                actions = {
+                    account?.let {
+                        AsyncImage(
+                            model = it.photoUrl,
+                            contentDescription = "Foto Profil",
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clickable { showProfileDialog = true }
+                        )
+                    } ?: Button(onClick = {
+                        val signInIntent = googleClient.getSignInIntent()
+                        launcher.launch(signInIntent)
+                    }) {
+                        Text("Login Google")
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = Color(0xFFFFE4EC),
+                    titleContentColor = Color.Black
                 )
             )
-        }
+        },
+        containerColor = Color(0xFFFFE4EC)
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Background image
             Image(
                 painter = painterResource(id = R.drawable.background),
                 contentDescription = "Background",
@@ -47,7 +96,6 @@ fun HomeScreen(navController: NavController) {
                 contentScale = ContentScale.Crop
             )
 
-            // Tombol di bagian bawah
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -55,41 +103,86 @@ fun HomeScreen(navController: NavController) {
                 verticalArrangement = Arrangement.Bottom,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                QuranButton {
-                    navController.navigate("surah_list")
-                }
+                QuranButton(
+                    onClick = { navController.navigate("surah_list") },
+                    enabled = account != null
+                )
             }
+        }
+
+        // ✅ Dialog Profil
+        if (showProfileDialog && account != null) {
+            AlertDialog(
+                onDismissRequest = { showProfileDialog = false },
+                title = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AsyncImage(
+                            model = account.photoUrl,
+                            contentDescription = "Foto Profil",
+                            modifier = Modifier.size(64.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = account.displayName ?: "Tidak ada nama")
+                        Text(text = account.email ?: "Tidak ada email", fontSize = 12.sp)
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        googleClient.signOut {
+                            onAccountChanged(null) // ✅ Update global account
+                            showProfileDialog = false
+                            showLoginPrompt = true
+                            Toast.makeText(context, "Logout berhasil", Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Text("Logout")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showProfileDialog = false }) {
+                        Text("Tutup")
+                    }
+                }
+            )
+        }
+
+        // ✅ Dialog Login Prompt
+        if (showLoginPrompt && account == null) {
+            AlertDialog(
+                onDismissRequest = { showLoginPrompt = false },
+                title = { Text("Login Diperlukan") },
+                text = { Text("Silakan login dengan akun Google terlebih dahulu untuk menjelajahi ayat suci Al-Qur'an.") },
+                confirmButton = {
+                    TextButton(onClick = { showLoginPrompt = false }) {
+                        Text("Oke")
+                    }
+                }
+            )
         }
     }
 }
 
 @Composable
-fun QuranButton(onClick: () -> Unit) {
+fun QuranButton(onClick: () -> Unit, enabled: Boolean) {
+    val backgroundColor = if (enabled) Color(0xFF90CAF9) else Color.LightGray
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .height(120.dp)
-            .clickable { onClick() },
+            .clickable(enabled = enabled) { if (enabled) onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-        ),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
         elevation = CardDefaults.cardElevation(8.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.Center
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Jelajahi Ayat Suci Al-Qur'an",
-                style = MaterialTheme.typography.bodyLarge,
-                fontSize = 28.sp,
-                fontStyle = FontStyle.Italic,
+                text = "Jelajahi Al-Qur'an",
+                fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(16.dp)
+                color = Color.Black
             )
         }
     }

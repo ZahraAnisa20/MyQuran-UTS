@@ -17,27 +17,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.example.myquran.viewmodel.SurahViewModel
 import com.example.myquran.data.Surah
 import com.example.myquran.R
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import androidx.compose.ui.unit.sp
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SurahListScreen(navController: NavController, viewModel: SurahViewModel) {
+fun SurahListScreen(
+    navController: NavController,
+    viewModel: SurahViewModel,
+    account: GoogleSignInAccount? // ✅ tambahkan parameter akun
+) {
     val surahList = viewModel.surahList.collectAsState().value
     val isLoading = viewModel.isLoading.collectAsState().value
 
     var searchQuery by remember { mutableStateOf(TextFieldValue("")) }
 
-    val backgroundColor = Color(0xFFD6F0FF) // c\biru muda dari gambar
+    val backgroundColor = Color(0xFFD6F0FF)
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("\uD83D\uDD4C Surah \uD83D\uDD4C") },
+                title = { Text("\uD83D\uDD4C Surah \uD83D\uDD4C", color = Color.Black) },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    containerColor = Color(0xFFFFE4EC), // ✅ warna soft pink seperti HomeScreen
+                    titleContentColor = Color.Black
                 )
             )
         }
@@ -48,6 +56,28 @@ fun SurahListScreen(navController: NavController, viewModel: SurahViewModel) {
                 .background(backgroundColor)
                 .padding(padding)
         ) {
+            // ✅ Tampilkan info akun jika tersedia
+            if (account != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    AsyncImage(
+                        model = account.photoUrl,
+                        contentDescription = "Foto Akun",
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(text = account.displayName ?: "", fontWeight = FontWeight.Bold)
+                        Text(text = account.email ?: "", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            // 🔍 Search field
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -90,12 +120,13 @@ fun SurahListScreen(navController: NavController, viewModel: SurahViewModel) {
         }
     }
 }
+
 @Composable
 fun SurahCard(
     surah: Surah,
     onClick: () -> Unit
 ) {
-    val cardColor = Color(0xFFFFE4EC) // warna pink
+    val cardColor = Color(0xFFFFE4EC) // Soft pink
 
     Card(
         onClick = onClick,
@@ -103,17 +134,13 @@ fun SurahCard(
             .fillMaxWidth()
             .padding(vertical = 6.dp, horizontal = 8.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = cardColor
-        )
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(16.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = surah.englishName,
                     style = MaterialTheme.typography.titleMedium,
